@@ -188,3 +188,54 @@ if __name__ == "__main__":
         time = (i*45.0)/60
         ax.set_title(f"{time} mins")
     fig.tight_layout()
+
+    print('Fit and plot sphere')
+    from scipy.optimize import minimize_scalar
+    injury_coords = dict(x=150, y=250, z=20)
+    zm, xm, ym = np.meshgrid(np.arange(64), np.arange(512), np.arange(512), indexing='ij')
+    tmpz = (zm - injury_coords['z'])**2
+    tmpx = (xm - injury_coords['x'])**2
+    tmpy = (ym - injury_coords['y'])**2
+
+    def lossfun(r, it, timeroll=3, edgewidth=60):
+        loss = 0
+        for ii in range(timeroll):
+            image_t = video[it + ii, 2]
+            loss += image_t[tmpx / r**2 + tmpy / r**2 + tmpz / r**2 < 1].mean()
+            loss -= image_t[(tmpx / r**2 + tmpy / r**2 + tmpz / r**2 >= 1) & (tmpx / (r + edgewidth)**2 + tmpy / (r + edgewidth)**2 + tmpz / (r + edgewidth)**2 < 1)].mean()
+        loss /= timeroll
+        return -loss
+
+    rmin = 15
+    rs = np.arange(rmin, rmin + 40, 3)
+    timeframes = [5, 8, 11, 15, 22, 28, 33, 40, 45, 50, 54, 59]
+    lossg = np.zeros((len(timeframes), len(rs)))
+    fit_results = []
+    for ii, i in enumerate(timeframes):
+        print('Timepoint', ii + 1, 'of', len(timeframes))
+        for ir, r in enumerate(rs):
+            lossg[ii, ir] = lossfun(r, ii)
+        #res = minimize_scalar(lossfun, args=(ii,), bounds=(5, 50), options=dict(maxiter=100, disp=True))
+        #fit_results.append(res)
+
+    fig, ax = plt.subplots()
+    ax.imshow(lossg, interpolation='nearest')
+    fig.tight_layout()
+
+
+    timeframes = [5, 8, 11, 15, 22, 28, 33, 40, 45, 50, 54, 59]
+    cmap = plt.get_cmap('viridis')
+    fig, ax = plt.subplots()
+    for ii, i in enumerate(timeframes):
+        image_t = video[ii, 2]
+        ax.plot(np.bincount(image_t.ravel()), color=cmap(1.0 * ii / len(timeframes)))
+    fig.tight_layout()
+
+    fig, axs = plt.subplots(5, 3, sharex=True, sharey=True, figsize=(15, 12))
+    axs = axs.ravel()
+    for ii, (i, ax) in enumerate(zip(timeframes, axs)):
+        image_t = video[ii, 2, 20]
+        image_bin = image_t > 200
+        axs[ii].imshow(image_bin, interpolation='nearest')
+    fig.tight_layout(pad=0)
+
