@@ -157,3 +157,34 @@ if __name__ == "__main__":
     fig.tight_layout()
     plt.ion(); plt.show()
 
+    
+    print('Fit and plot ellipsoid')
+    injury_coords = dict(x=150, y=250, z=20)
+    zm, xm, ym = np.meshgrid(np.arange(64), np.arange(512), np.arange(512), indexing='ij')
+    tmpz = (zm - injury_coords['z'])**2
+    tmpx = (xm - injury_coords['x'])**2
+    tmpy = (ym - injury_coords['y'])**2
+
+    def lossfun(r, rz, it):
+        image_t = video[it, 2]
+        loss = image_t[tmpx / r**2 + tmpy / r**2 + tmpz / rz**2 < 1].mean()
+        loss -= image_t[(tmpx / r**2 + tmpy / r**2 + tmpz / rz**2 >= 1) & (tmpx / (r + 3)**2 + tmpy / (r + 3)**2 + tmpz / (rz + 3)**2 < 1)].mean()
+        return -loss
+
+    rmin = 12
+    rs = np.arange(rmin, rmin + 14)
+    rzs = np.arange(1, 14)
+    timeframes = [5, 8, 11, 15, 22, 28, 33, 40, 45, 50, 54, 59]
+    lossg = np.zeros((len(timeframes), len(rs), len(rzs)))
+    for ii, i in enumerate(timeframes):
+        for ir, r in enumerate(rs):
+            for irz, rz in enumerate(rzs):
+                lossg[ii, ir, irz] = lossfun(r, rz, ii)
+
+    fig, axs = plt.subplots(1, len(timeframes))
+    for ii, i in enumerate(timeframes):
+        ax = axs[ii]
+        ax.imshow(-lossg[ii], interpolation='nearest')
+        time = (i*45.0)/60
+        ax.set_title(f"{time} mins")
+    fig.tight_layout()
